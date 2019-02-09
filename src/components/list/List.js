@@ -1,41 +1,54 @@
 import React from 'react';
-import { handleResponse } from '../../helpers';
 import { API_URL } from '../../config';
+import { handleResponse } from '../../helpers.js';
+import Pagination from './Pagination';
 import Loading from '../common/Loading';
-import './Table.css';
 import Table from './Table';
-import Pagination from './pagination';
-
-
 
 class List extends React.Component {
   constructor() {
     super();
 
     this.state = {
-      loading: false,
+      page: 1,
+      totalPages: 0,
+      // NOTE: Don't set it greater than 50, because maximum perPage for API is 50
+      perPage: 20,
       currencies: [],
-      error: null,
-      page: 1
+      loading: false,
+      error: '',
     };
 
     this.handlePaginationClick = this.handlePaginationClick.bind(this);
   }
 
-  componentDidMount() {
+  componentWillMount() {
+    this.fetchCurrencies();
+  }
+
+  fetchCurrencies() {
+    const { page, perPage } = this.state;
+
+    // Set loading to true, while we are fetching data from server
     this.setState({ loading: true });
 
-    const { page } = this.state;
-    
-    fetch(`${API_URL}/cryptocurrencies?page=${page}&perPage=20`)
+    // Fetch crypto currency data from API with page and perPage parameters
+    fetch(`${API_URL}/cryptocurrencies/?page=${page}&perPage=${perPage}`)
       .then(handleResponse)
       .then((data) => {
+        // Set received data in components state
+        // Clear error if any and set loading to false
+        const { totalPages, currencies } = data;
+
         this.setState({
-          currencies: data.currencies,
+          currencies,
+          totalPages,
+          error: '',
           loading: false,
         });
       })
       .catch((error) => {
+        // Show error message, if request fails and set loading to false
         this.setState({
           error: error.errorMessage,
           loading: false,
@@ -43,53 +56,43 @@ class List extends React.Component {
       });
   }
 
-    renderChangePercent(percent) {
+  handlePaginationClick(direction) {
+    let nextPage = this.state.page;
 
-    
+    // Increment nextPage if direction variable is next, otherwise decrement it
+    nextPage = direction === 'next' ? nextPage + 1 : nextPage - 1;
 
-      if (percent > 0) {
-        return <span className="percent-raised">{percent}% &uarr;</span>
-      } else if (percent < 0) {
-        return <span className="percent-fallen">{percent}% &darr;</span>
-      } else {
-        return <span>{percent}</span>
-      }
-    }
-
-    handlePaginationClick(direction){
-      let nextPage = this.state.page;
-      nextPage = direction === 'next' ? nextPage + 1 : nextPage - 1;
-      this.setState({page: nextPage})
-    }
-
+    // Call fetchCurrencies function inside setState's callback
+    // Because we have to make sure first page state is updated
+    this.setState({ page: nextPage }, () => {
+      this.fetchCurrencies();
+    });
+  }
 
   render() {
-    console.log(this.state.page)
-    
-    const { loading, error, currencies } = this.state;
+    const { currencies, loading, error, page, totalPages } = this.state;
 
-    // render only loading component, if loading state is set to true
+    // Render only loading component, if it's set to true
     if (loading) {
       return <div className="loading-container"><Loading /></div>
     }
 
-    // render only error message, if error occurred while fetching data
+    // Render only error message, if error occured while fetching data
     if (error) {
       return <div className="error">{error}</div>
     }
 
     return (
-       <div>
-         <Table 
-            currencies = {currencies} 
-            renderChangePercent = {this.renderChangePercent} 
-            />
-        <Pagination handlePaginationClick = {this.handlePaginationClick}/>
+      <div>
+        <Table currencies={currencies} />
 
-       </div>
-
-    )
-      
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          handlePaginationClick={this.handlePaginationClick}
+        />
+      </div>
+    );
   }
 }
 
